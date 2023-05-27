@@ -1,0 +1,77 @@
+version: '3'
+
+networks:
+  timer-network:
+    driver: bridge
+
+services:
+  timer:
+    build: .
+    ports:
+      - "8080:8080"
+    networks:
+      - timer-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.3
+    restart: always
+    container_name: zookeeper
+    hostname: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - timer-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.3
+    restart: always
+    container_name: kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT, PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - timer-network
+
+  redis:
+    image: 'bitnami/redis:latest'
+    restart: always
+    environment:
+      #ALLOW_EMPTY_PASSWORD: yes
+      REDIS_PASSWORD: redis
+      REDIS_PORT_NUMBER: 6379
+    ports:
+      - "6379:6379"
+    command: /opt/bitnami/scripts/redis/run.sh --maxmemory 100mb
+    networks:
+      - timer-network
+
+  #schema_registry:
+  #  image: confluentinc/cp-schema-registry:latest
+  #  restart: always
+  #  container_name: schema_registry
+  #  hostname: schema_registry
+  #  depends_on:
+  #    - zookeeper
+  #    - kafka
+  #  ports:
+  #    - "8081:8081"
+  #  environment:
+  #    SCHEMA_REGISTRY_HOST_NAME: schema_registry
+  #    SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
+  #    SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_ORIGIN: '*'
+  #    SCHEMA_REGISTRY_ACCESS_CONTROL_ALLOW_METHODS: 'GET,POST,PUT,OPTIONS'
+  #  networks:
+  #    - timer-network
